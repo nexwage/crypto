@@ -39,6 +39,23 @@ export {
   verifySignature,
 } from "./crypto/signature.js";
 
+export type {
+  GroupMember,
+  GroupMemberWire,
+  GroupState,
+  GroupWelcome,
+  GroupCommit,
+  GroupCommitAction,
+} from "./crypto/group.js";
+export {
+  createGroupState,
+  openGroupWelcome,
+  deriveGroupKey,
+  createGroupCommit,
+  verifyGroupCommitSignature,
+  applyGroupCommit,
+} from "./crypto/group.js";
+
 export type { PasswordKdfOptions } from "./crypto/password-kdf.js";
 export {
   deriveKeyFromPassword,

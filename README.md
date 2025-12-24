@@ -95,6 +95,57 @@ Alur 3: Recovery + re-encrypt
 
 Semua fungsi diekspor dari `@nexwage/crypto`.
 
+### Peta Penggunaan di Kasus Industri (Per Domain)
+
+#### Simetris (Password + File + Recovery)
+
+| Metode/Fitur | Kasus Industri Nyata | Kenapa Dipakai | Contoh Implementasi |
+| --- | --- | --- | --- |
+| Master Key + Password KDF | Zero‑knowledge SaaS (password vault, secure notes) | Password tidak pernah dikirim ke server; master key tetap terenkripsi | `generateMasterKeyWithPassword` saat signup, simpan `wrapped` di server |
+| Recovery Key | Recovery akun tanpa reset password | Memberi opsi recovery tanpa membuka password | Simpan `wrapMasterKeyWithRecoveryKey` di server, recovery key dipegang user |
+| File Key + Wrap | Enkripsi per file untuk performa dan isolasi | Setiap file punya key sendiri; kompromi satu file tidak bocor semua | `generateFileKey` + `wrapFileKeyWithMasterKey` per file |
+| AEAD XChaCha20-Poly1305 | Enkripsi data at rest/in transit | Authenticated encryption, tahan tampering | `encryptFileData` / `decryptFileData` |
+| AAD | Bind data ke konteks (userId, fileId, slot) | Mencegah swap/replay antar konteks | AAD berisi `userId|fileId|slot` |
+| Versioning (`v`) | Migrasi format/enkripsi | Menjaga kompatibilitas payload lama | Simpan `v` di payload, upgrade saat decrypt |
+
+#### Asimetris (Key Exchange + Signature)
+
+| Metode/Fitur | Kasus Industri Nyata | Kenapa Dipakai | Contoh Implementasi |
+| --- | --- | --- | --- |
+| Key Exchange (X25519) | Secure session key (chat, realtime sync) | Negosiasi kunci simetris tanpa berbagi rahasia | `deriveClientSessionKeys` + `deriveServerSessionKeys` |
+| Sealed Box | Share ke penerima tanpa keypair pengirim | Enkripsi langsung ke public key penerima | `encryptSealedBox` untuk file sharing 1:1 |
+| Signature (Ed25519) | Audit log, proof of authorship | Verifikasi integritas dan sumber data | Tanda tangan metadata/commit dengan `signMessage` |
+
+#### Group (MLS-like)
+
+| Metode/Fitur | Kasus Industri Nyata | Kenapa Dipakai | Contoh Implementasi |
+| --- | --- | --- | --- |
+| Group Commit + Epoch | Team sharing (drive tim, workspace) | Rotasi kunci saat member berubah | `createGroupCommit` + `applyGroupCommit` setiap perubahan anggota |
+| Group Key Derivation | Enkripsi grup skala besar | Satu group key untuk banyak file | `deriveGroupKey` untuk wrap file key |
+| Welcome Payload | Onboarding member baru | Distribusi secret awal dengan aman | `createGroupState` + `openGroupWelcome` |
+
+#### Wrapper libsodium
+
+| Metode/Fitur | Kasus Industri Nyata | Kenapa Dipakai | Contoh Implementasi |
+| --- | --- | --- | --- |
+| libsodium Wrapper | Akses primitive low-level | Integrasi fleksibel ke arsitektur existing | `cryptoPwhash`, `aeadXChaCha20Poly1305IetfEncrypt` |
+
+### Tipe Export
+
+- `AeadEnvelopeV1`
+- `PasswordKdfParamsV1`
+- `PasswordWrappedKeyV1`
+- `PasswordKdfOptions`
+- `KeyExchangeKeyPair`
+- `SessionKeys`
+- `SigningKeyPair`
+- `GroupMember`
+- `GroupMemberWire`
+- `GroupState`
+- `GroupWelcome`
+- `GroupCommit`
+- `GroupCommitAction`
+
 ### Master Key
 
 - `generateMasterKey(): Promise<Uint8Array>`
@@ -175,6 +226,21 @@ Signature (Ed25519):
 - `signMessage(message, privateKey): Promise<Uint8Array>`
 - `verifySignature(message, signature, publicKey): Promise<boolean>`
 
+### Group (MLS-like, tahap awal)
+
+Implementasi awal untuk group key management dengan commit + epoch. Saat ini masih O(n) karena secret baru dibagikan via sealed box ke setiap member. Struktur API disiapkan agar dapat ditingkatkan ke tree-based MLS.
+
+- `createGroupState(groupId, members): Promise<{ state; welcome }>`
+- `openGroupWelcome(welcome, recipientId, recipientKeyPair): Promise<GroupState>`
+- `deriveGroupKey(state): Promise<Uint8Array>`
+- `createGroupCommit(state, senderId, senderSignPrivateKey, action, updates?): Promise<{ commit; state }>`
+- `verifyGroupCommitSignature(commit, senderSignPublicKey): Promise<boolean>`
+- `applyGroupCommit(state, commit, recipientId, recipientKeyPair, senderSignPublicKey): Promise<GroupState>`
+
+Catatan:
+- `GroupMember.signPublicKey` bersifat opsional dan hanya diperlukan jika kamu ingin menyimpan public key signature di metadata group.
+- Semua payload group disarankan disimpan sebagai JSON di server (zero-knowledge friendly).
+
 ## Format Payload
 
 AEAD envelope:
@@ -221,11 +287,18 @@ const aad = fromString("uid:user_123|app:v1|slot:password");
 | `src/crypto/master-key.ts` | Lifecycle master key. |
 | `src/crypto/recovery-key.ts` | Recovery key wrapping. |
 | `src/crypto/file-encryption.ts` | File key + enkripsi/dekripsi file. |
+| `src/crypto/key-exchange.ts` | Key exchange (X25519) + sealed box. |
+| `src/crypto/signature.ts` | Tanda tangan digital (Ed25519). |
+| `src/crypto/group.ts` | Group key management (MLS-like tahap awal). |
 | `src/utils/encoding.ts` | Helper base64. |
 | `src/utils/bytes.ts` | Validasi panjang bytes. |
 | `src/sodium.ts` | Wrapper libsodium. |
 | `examples/basic-flow.ts` | Contoh alur end-to-end. |
 | `examples/master-key-example.ts` | Contoh master key + KDF. |
+| `examples/asymmetric-key-exchange.ts` | Contoh key exchange + sealed box. |
+| `examples/asymmetric-signature.ts` | Contoh signature. |
+| `examples/group-basic.ts` | Contoh group basic. |
+| `SIMULATION.md` | Simulasi ringkas simetris & asimetris. |
 
 ## Pengujian
 
@@ -247,6 +320,7 @@ Jalankan contoh:
 npm run example:kx
 npm run example:sign
 npm run example:basic
+npm run example:group
 ```
 
 Contoh output (ringkas):
@@ -308,6 +382,22 @@ Contoh output error (AAD/password salah):
 Error: Gagal membuka file: ciphertext/AAD/keys tidak valid
 Error: Gagal membuka key: ciphertext/AAD/keys tidak valid
 Error: Gagal membuka payload: ciphertext/AAD/keys tidak valid
+```
+
+Group:
+```text
+[group] create members
+[group] create group state
+[group] welcome epoch: 0
+[group] members: alice, bob
+[group] bob open welcome
+[group] bob groupKey epoch 0 (b64): ...
+[group] add carol with commit
+[group] commit epoch: 1
+[group] commit action: add
+[group] commit members: alice, bob, carol
+[group] bob apply commit
+[group] bob groupKey epoch 1 (b64): ...
 ```
 
 ## Glossary

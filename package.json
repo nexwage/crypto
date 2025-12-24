@@ -16,7 +16,8 @@
     "build": "tsc -p tsconfig.json",
     "example:kx": "tsx examples/asymmetric-key-exchange.ts",
     "example:sign": "tsx examples/asymmetric-signature.ts",
-    "example:basic": "tsx examples/basic-flow.ts"
+    "example:basic": "tsx examples/basic-flow.ts",
+    "example:group": "tsx examples/group-basic.ts"
   },
   "keywords": [],
   "author": "",

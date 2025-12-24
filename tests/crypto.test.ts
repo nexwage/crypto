@@ -38,6 +38,11 @@ import {
   wrapMasterKeyWithRecoveryKey,
   wrapRecoveryKeyWithMasterKey,
   verifySignature,
+  createGroupState,
+  openGroupWelcome,
+  createGroupCommit,
+  applyGroupCommit,
+  deriveGroupKey,
 } from "../src/index.js";
 
 describe("crypto flows", () => {
@@ -175,6 +180,140 @@ describe("crypto flows", () => {
     expect(ok).toBe(true);
     const fail = await verifySignature(fromString("lain"), signature, publicKey);
     expect(fail).toBe(false);
+  });
+
+  test("group state, welcome, and commit flow", async () => {
+    const aliceEnc = await generateKeyExchangeKeyPair();
+    const bobEnc = await generateKeyExchangeKeyPair();
+    const aliceSign = await generateSigningKeyPair();
+
+    const { state, welcome } = await createGroupState("group-1", [
+      {
+        id: "alice",
+        encPublicKey: aliceEnc.publicKey,
+        signPublicKey: aliceSign.publicKey,
+      },
+      { id: "bob", encPublicKey: bobEnc.publicKey },
+    ]);
+
+    const bobState = await openGroupWelcome(welcome, "bob", bobEnc);
+    const groupKey1 = await deriveGroupKey(bobState);
+    expect(groupKey1.length).toBe(32);
+
+    const carolEnc = await generateKeyExchangeKeyPair();
+    const { commit, state: nextState } = await createGroupCommit(
+      state,
+      "alice",
+      aliceSign.privateKey,
+      "add",
+      {
+        add: [{ id: "carol", encPublicKey: carolEnc.publicKey }],
+      }
+    );
+
+    const bobNextState = await applyGroupCommit(
+      bobState,
+      commit,
+      "bob",
+      bobEnc,
+      aliceSign.publicKey
+    );
+    const groupKey2 = await deriveGroupKey(bobNextState);
+    expect(groupKey2.length).toBe(32);
+    expect(bobNextState.epoch).toBe(nextState.epoch);
+  });
+
+  test("group commit add and rotate branches", async () => {
+    const aliceEnc = await generateKeyExchangeKeyPair();
+    const aliceSign = await generateSigningKeyPair();
+    const { state } = await createGroupState("group-rotate", [
+      { id: "alice", encPublicKey: aliceEnc.publicKey },
+    ]);
+
+    await createGroupCommit(state, "alice", aliceSign.privateKey, "add");
+    await createGroupCommit(state, "alice", aliceSign.privateKey, "rotate");
+  });
+
+  test("group commit add with empty state members", async () => {
+    const aliceEnc = await generateKeyExchangeKeyPair();
+    const aliceSign = await generateSigningKeyPair();
+    const emptyState = {
+      groupId: "group-empty",
+      epoch: 0,
+      members: undefined as unknown as typeof state.members,
+      secret: randombytesBuf(32),
+    };
+
+    await createGroupCommit(
+      emptyState,
+      "alice",
+      aliceSign.privateKey,
+      "add",
+      { add: [{ id: "alice", encPublicKey: aliceEnc.publicKey }] }
+    );
+  });
+
+  test("group welcome rejects missing recipient", async () => {
+    const aliceEnc = await generateKeyExchangeKeyPair();
+    const { welcome } = await createGroupState("group-err", [
+      { id: "alice", encPublicKey: aliceEnc.publicKey },
+    ]);
+    await expect(
+      openGroupWelcome(welcome, "bob", aliceEnc)
+    ).rejects.toThrow("Welcome tidak berisi secret");
+  });
+
+  test("group commit remove branch and apply errors", async () => {
+    const aliceEnc = await generateKeyExchangeKeyPair();
+    const bobEnc = await generateKeyExchangeKeyPair();
+    const aliceSign = await generateSigningKeyPair();
+
+    const { state } = await createGroupState("group-2", [
+      { id: "alice", encPublicKey: aliceEnc.publicKey },
+      { id: "bob", encPublicKey: bobEnc.publicKey },
+    ]);
+
+    const { commit } = await createGroupCommit(
+      state,
+      "alice",
+      aliceSign.privateKey,
+      "remove",
+      { removeIds: ["bob"] }
+    );
+    expect(commit.removedMemberIds?.includes("bob")).toBe(true);
+
+    await expect(
+      applyGroupCommit(
+        { ...state, groupId: "group-x" },
+        commit,
+        "bob",
+        bobEnc,
+        aliceSign.publicKey
+      )
+    ).rejects.toThrow("groupId commit tidak cocok");
+
+    await expect(
+      applyGroupCommit(
+        { ...state, epoch: 99 },
+        commit,
+        "bob",
+        bobEnc,
+        aliceSign.publicKey
+      )
+    ).rejects.toThrow("epoch commit tidak valid");
+
+    await expect(
+      applyGroupCommit(state, commit, "bob", bobEnc, bobEnc.publicKey)
+    ).rejects.toThrow("signature commit tidak valid");
+
+    const commitMissingSecret = {
+      ...commit,
+      encryptedSecrets: { ...commit.encryptedSecrets },
+    };
+    delete commitMissingSecret.encryptedSecrets["bob"];
+    await expect(
+      applyGroupCommit(state, commitMissingSecret, "bob", bobEnc, aliceSign.publicKey)
+    ).rejects.toThrow("commit tidak berisi secret");
   });
 
   test("file decryption fails on wrong AAD", async () => {
