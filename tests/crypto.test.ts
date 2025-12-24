@@ -21,6 +21,7 @@ import {
   generateMasterKeyWithPassword,
   generateRecoveryKey,
   generateSigningKeyPair,
+  signMessageWithNonce,
   memcmp,
   fromBase64,
   fromString,
@@ -38,6 +39,7 @@ import {
   wrapMasterKeyWithRecoveryKey,
   wrapRecoveryKeyWithMasterKey,
   verifySignature,
+  verifySignedMessage,
   createGroupState,
   openGroupWelcome,
   createGroupCommit,
@@ -180,6 +182,17 @@ describe("crypto flows", () => {
     expect(ok).toBe(true);
     const fail = await verifySignature(fromString("lain"), signature, publicKey);
     expect(fail).toBe(false);
+  });
+
+  test("signature with nonce is valid and fails on replay data change", async () => {
+    const { publicKey, privateKey } = await generateSigningKeyPair();
+    const payload = await signMessageWithNonce(fromString("aksi penting"), privateKey);
+    const ok = await verifySignedMessage(payload, publicKey);
+    expect(ok).toBe(true);
+
+    const tampered = { ...payload, nonce: payload.nonce.replace(/./, "A") };
+    const bad = await verifySignedMessage(tampered, publicKey);
+    expect(bad).toBe(false);
   });
 
   test("group state, welcome, and commit flow", async () => {

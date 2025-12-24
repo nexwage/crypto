@@ -36,8 +36,12 @@ export type { SigningKeyPair } from "./crypto/signature.js";
 export {
   generateSigningKeyPair,
   signMessage,
+  signMessageWithNonce,
   verifySignature,
+  verifySignedMessage,
 } from "./crypto/signature.js";
+
+export type { SignedMessageV1 } from "./crypto/signature.js";
 
 export type {
   GroupMember,

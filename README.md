@@ -115,6 +115,7 @@ Semua fungsi diekspor dari `@nexwage/crypto`.
 | Key Exchange (X25519) | Secure session key (chat, realtime sync) | Negosiasi kunci simetris tanpa berbagi rahasia | `deriveClientSessionKeys` + `deriveServerSessionKeys` |
 | Sealed Box | Share ke penerima tanpa keypair pengirim | Enkripsi langsung ke public key penerima | `encryptSealedBox` untuk file sharing 1:1 |
 | Signature (Ed25519) | Audit log, proof of authorship | Verifikasi integritas dan sumber data | Tanda tangan metadata/commit dengan `signMessage` |
+| Signature Anti‑Replay | API request sensitif (approve, payment, revoke) | Mencegah replay dengan nonce+timestamp | `signMessageWithNonce` + simpan nonce di server |
 
 #### Group (MLS-like)
 
@@ -139,6 +140,7 @@ Semua fungsi diekspor dari `@nexwage/crypto`.
 - `KeyExchangeKeyPair`
 - `SessionKeys`
 - `SigningKeyPair`
+- `SignedMessageV1`
 - `GroupMember`
 - `GroupMemberWire`
 - `GroupState`
@@ -225,6 +227,12 @@ Signature (Ed25519):
 - `generateSigningKeyPair(): Promise<{ publicKey; privateKey }>`
 - `signMessage(message, privateKey): Promise<Uint8Array>`
 - `verifySignature(message, signature, publicKey): Promise<boolean>`
+- `signMessageWithNonce(message, privateKey, opts?): Promise<SignedMessageV1>`
+- `verifySignedMessage(payload, publicKey): Promise<boolean>`
+
+Anti‑replay:
+- `signMessageWithNonce` menambahkan `nonce` + `timestamp` ke payload yang ditandatangani.
+- Simpan nonce yang sudah dipakai (mis. di cache/DB) untuk mencegah replay.
 
 ### Group (MLS-like, tahap awal)
 
