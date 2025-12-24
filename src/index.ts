@@ -23,6 +23,22 @@ export {
   unwrapRecoveryKeyWithMasterKey,
 } from "./crypto/recovery-key.js";
 
+export type { KeyExchangeKeyPair, SessionKeys } from "./crypto/key-exchange.js";
+export {
+  generateKeyExchangeKeyPair,
+  deriveClientSessionKeys,
+  deriveServerSessionKeys,
+  encryptSealedBox,
+  decryptSealedBox,
+} from "./crypto/key-exchange.js";
+
+export type { SigningKeyPair } from "./crypto/signature.js";
+export {
+  generateSigningKeyPair,
+  signMessage,
+  verifySignature,
+} from "./crypto/signature.js";
+
 export type { PasswordKdfOptions } from "./crypto/password-kdf.js";
 export {
   deriveKeyFromPassword,

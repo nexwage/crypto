@@ -157,6 +157,24 @@ Wrapper disediakan agar fungsi libsodium bisa dipanggil dari library ini:
 
 Catatan: konstanta seperti `cryptoPwhashSaltBytes` diisi setelah `sodiumReady()` dipanggil.
 
+### Asimetris: Key Exchange & Signature
+
+Library ini menyediakan dua keypair terpisah:
+1) X25519 untuk key exchange/shared key.
+2) Ed25519 untuk tanda tangan digital.
+
+Key exchange (X25519):
+- `generateKeyExchangeKeyPair(): Promise<{ publicKey; privateKey }>`
+- `deriveClientSessionKeys(clientKeyPair, serverPublicKey): Promise<{ rx; tx }>`
+- `deriveServerSessionKeys(serverKeyPair, clientPublicKey): Promise<{ rx; tx }>`
+- `encryptSealedBox(message, recipientPublicKey): Promise<Uint8Array>`
+- `decryptSealedBox(ciphertext, recipientKeyPair): Promise<Uint8Array>`
+
+Signature (Ed25519):
+- `generateSigningKeyPair(): Promise<{ publicKey; privateKey }>`
+- `signMessage(message, privateKey): Promise<Uint8Array>`
+- `verifySignature(message, signature, publicKey): Promise<boolean>`
+
 ## Format Payload
 
 AEAD envelope:
@@ -219,6 +237,77 @@ npm test
 
 ```sh
 npm run build
+```
+
+## Examples
+
+Jalankan contoh:
+
+```sh
+npm run example:kx
+npm run example:sign
+npm run example:basic
+```
+
+Contoh output (ringkas):
+
+Key exchange + sealed box:
+```text
+[kx] generate keypairs
+[kx] client public key (b64): ...
+[kx] server public key (b64): ...
+[kx] derive session keys
+[kx] client tx (b64): ...
+[kx] client rx (b64): ...
+[kx] server tx (b64): ...
+[kx] server rx (b64): ...
+[kx] shared tx/rx matches (base64 compare):
+[kx] client tx == server rx: true
+[kx] client rx == server tx: true
+[sealed] encrypt to server public key
+[sealed] ciphertext (b64): ...
+[sealed] ciphertext bytes: ...
+[sealed] decrypt with server keypair
+[sealed] plaintext: hello sealed box
+```
+
+Signature:
+```text
+[sign] generate keypair
+[sign] public key (b64): ...
+[sign] private key bytes: 64
+[sign] message bytes: ...
+[sign] create signature
+[sign] signature (b64): ...
+[sign] signature bytes: 64
+[sign] verify signature (valid)
+[sign] result: true
+[sign] verify signature (invalid)
+[sign] result: false
+```
+
+Basic flow:
+```text
+[alur1] masterKey: ...
+[alur1] wrappedMasterKey: ...
+[alur1] wrappedMasterKeyByRecovery: ...
+[alur1] wrappedRecoveryKey: ...
+[alur1] wrappedFileKey: ...
+[alur1] encryptedFile: ...
+[alur2] masterKey2: ...
+[alur2] fileKey2: ...
+[alur2] fileBytes2: file rahasia
+[alur3] masterKey3: ...
+[alur3] wrappedMasterKeyNew: ...
+[alur3] wrappedMasterKeyByRecoveryNew: ...
+[done] semua alur OK
+```
+
+Contoh output error (AAD/password salah):
+```text
+Error: Gagal membuka file: ciphertext/AAD/keys tidak valid
+Error: Gagal membuka key: ciphertext/AAD/keys tidak valid
+Error: Gagal membuka payload: ciphertext/AAD/keys tidak valid
 ```
 
 ## Glossary

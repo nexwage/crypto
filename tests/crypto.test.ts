@@ -8,17 +8,24 @@ import {
   cryptoPwhashSaltBytes,
   base64VariantOriginal,
   decryptFileData,
+  decryptSealedBox,
   deriveKeyFromPassword,
+  deriveClientSessionKeys,
+  deriveServerSessionKeys,
   encodeBase64,
   decodeBase64,
   encryptFileData,
+  encryptSealedBox,
   generateFileKey,
+  generateKeyExchangeKeyPair,
   generateMasterKeyWithPassword,
   generateRecoveryKey,
+  generateSigningKeyPair,
   memcmp,
   fromBase64,
   fromString,
   randombytesBuf,
+  signMessage,
   sodiumReady,
   sodium,
   toBase64,
@@ -30,6 +37,7 @@ import {
   wrapFileKeyWithMasterKey,
   wrapMasterKeyWithRecoveryKey,
   wrapRecoveryKeyWithMasterKey,
+  verifySignature,
 } from "../src/index.js";
 
 describe("crypto flows", () => {
@@ -134,6 +142,39 @@ describe("crypto flows", () => {
     );
 
     expect(new TextDecoder().decode(decrypted)).toBe("data");
+  });
+
+  test("key exchange session keys match", async () => {
+    const clientKeyPair = await generateKeyExchangeKeyPair();
+    const serverKeyPair = await generateKeyExchangeKeyPair();
+    const client = await deriveClientSessionKeys(
+      clientKeyPair,
+      serverKeyPair.publicKey
+    );
+    const server = await deriveServerSessionKeys(
+      serverKeyPair,
+      clientKeyPair.publicKey
+    );
+    expect(memcmp(client.tx, server.rx)).toBe(true);
+    expect(memcmp(client.rx, server.tx)).toBe(true);
+  });
+
+  test("sealed box round-trip", async () => {
+    const recipient = await generateKeyExchangeKeyPair();
+    const message = fromString("sealed");
+    const ciphertext = await encryptSealedBox(message, recipient.publicKey);
+    const plaintext = await decryptSealedBox(ciphertext, recipient);
+    expect(toString(plaintext)).toBe("sealed");
+  });
+
+  test("signature sign/verify", async () => {
+    const { publicKey, privateKey } = await generateSigningKeyPair();
+    const message = fromString("pesan");
+    const signature = await signMessage(message, privateKey);
+    const ok = await verifySignature(message, signature, publicKey);
+    expect(ok).toBe(true);
+    const fail = await verifySignature(fromString("lain"), signature, publicKey);
+    expect(fail).toBe(false);
   });
 
   test("file decryption fails on wrong AAD", async () => {
