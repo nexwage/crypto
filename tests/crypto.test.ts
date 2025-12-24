@@ -9,6 +9,8 @@ import {
   base64VariantOriginal,
   decryptFileData,
   decryptSealedBox,
+  deriveKeyExchangePublicKeyFromPrivateKey,
+  keyExchangeKeyPairFromPrivateKey,
   deriveKeyFromPassword,
   deriveClientSessionKeys,
   deriveServerSessionKeys,
@@ -164,6 +166,19 @@ describe("crypto flows", () => {
     );
     expect(memcmp(client.tx, server.rx)).toBe(true);
     expect(memcmp(client.rx, server.tx)).toBe(true);
+  });
+
+  test("derive public key from private key matches generated public key", async () => {
+    const kp = await generateKeyExchangeKeyPair();
+    const derived = await deriveKeyExchangePublicKeyFromPrivateKey(kp.privateKey);
+    expect(memcmp(kp.publicKey, derived)).toBe(true);
+  });
+
+  test("keyExchangeKeyPairFromPrivateKey reconstructs same keypair", async () => {
+    const kp = await generateKeyExchangeKeyPair();
+    const reconstructed = await keyExchangeKeyPairFromPrivateKey(kp.privateKey);
+    expect(memcmp(kp.publicKey, reconstructed.publicKey)).toBe(true);
+    expect(memcmp(kp.privateKey, reconstructed.privateKey)).toBe(true);
   });
 
   test("sealed box round-trip", async () => {

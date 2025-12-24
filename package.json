@@ -1,6 +1,6 @@
 {
   "name": "@nexwage/crypto",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Minimal crypto building blocks using libsodium (XChaCha20-Poly1305 + Argon2).",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

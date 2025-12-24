@@ -26,6 +26,8 @@ export {
 export type { KeyExchangeKeyPair, SessionKeys } from "./crypto/key-exchange.js";
 export {
   generateKeyExchangeKeyPair,
+  deriveKeyExchangePublicKeyFromPrivateKey,
+  keyExchangeKeyPairFromPrivateKey,
   deriveClientSessionKeys,
   deriveServerSessionKeys,
   encryptSealedBox,

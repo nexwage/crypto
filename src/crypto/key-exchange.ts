@@ -23,6 +23,37 @@ export async function generateKeyExchangeKeyPair(): Promise<KeyExchangeKeyPair> 
 }
 
 /**
+ * Generate public key (X25519) dari private key untuk key exchange.
+ *
+ * @param privateKey - Private key X25519.
+ * @returns Public key X25519.
+ */
+export async function deriveKeyExchangePublicKeyFromPrivateKey(
+  privateKey: Uint8Array
+): Promise<Uint8Array> {
+  await sodium.ready;
+  assertByteLength(
+    "privateKey",
+    privateKey,
+    sodium.crypto_kx_SECRETKEYBYTES
+  );
+  return sodium.crypto_scalarmult_base(privateKey);
+}
+
+/**
+ * Rekonstruksi keypair key exchange dari private key (public key akan diderivasi).
+ *
+ * @param privateKey - Private key X25519.
+ * @returns Public/private key pair.
+ */
+export async function keyExchangeKeyPairFromPrivateKey(
+  privateKey: Uint8Array
+): Promise<KeyExchangeKeyPair> {
+  const publicKey = await deriveKeyExchangePublicKeyFromPrivateKey(privateKey);
+  return { publicKey, privateKey };
+}
+
+/**
  * Derivasi session keys untuk sisi client.
  *
  * @param clientKeyPair - Key pair client.
