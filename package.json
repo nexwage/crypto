@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "start": "tsx examples/basic-flow.ts",
     "build": "tsc -p tsconfig.json"
   },
