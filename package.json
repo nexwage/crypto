@@ -24,6 +24,14 @@
     "dist",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nexwage/crypto.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nexwage/crypto.git/issues"
+  },
+  "homepage": "https://github.com/nexwage/crypto.git#readme",
   "publishConfig": {
     "access": "public"
   },
